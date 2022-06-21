@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/containers/podman/v3/libpod/define"
+	nettypes "github.com/containers/podman/v3/libpod/network/types"
 	"github.com/containers/podman/v3/pkg/bindings"
 	"github.com/containers/podman/v3/pkg/bindings/containers"
 	"github.com/containers/podman/v3/pkg/bindings/images"
@@ -60,11 +61,18 @@ func main() {
 		finalMounts = append(finalMounts, mount)
 	}
 
+	// 设置 port mapping
+	// make port mapping
+	portMapping := make([]nettypes.PortMapping, 1, 1)
+	portMapping[0].HostPort = 8080
+	portMapping[0].ContainerPort = 80
+
 	// 创建一个容器
 	// create a container
 	s := specgen.NewSpecGenerator(imageUrl, false)
 	s.Name = "web01"
 	s.Mounts = finalMounts
+	s.PortMappings = portMapping
 	createResponse, err := containers.CreateWithSpec(conn, s, nil)
 	if err != nil {
 		fmt.Println(err)
