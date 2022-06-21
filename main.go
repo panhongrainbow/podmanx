@@ -3,12 +3,20 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
-
+	"github.com/containers/podman/v3/libpod/define"
 	"github.com/containers/podman/v3/pkg/bindings"
 	"github.com/containers/podman/v3/pkg/bindings/containers"
 	"github.com/containers/podman/v3/pkg/bindings/images"
 	"github.com/containers/podman/v3/pkg/specgen"
+	spec "github.com/opencontainers/runtime-spec/specs-go"
+	"os"
+	"path/filepath"
+)
+
+const (
+	// imageUrl 为去拉取的镜像地址
+	// imageUrl is the URL of the image to be pulled.
+	imageUrl = "docker.io/library/httpd:latest"
 )
 
 // 先测试再封装
@@ -26,16 +34,37 @@ func main() {
 
 	// 下载镜像
 	// pull an image
-	_, err = images.Pull(conn, "quay.io/libpod/alpine_nginx:latest", nil)
+	_, err = images.Pull(conn, imageUrl, nil)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
+	// 挂载目录
+	// mount a directory
+	mountFlag := define.TypeBind
+	volumeMounts, _, _, _ := specgen.GenVolumeMounts([]string{"/home/panhong/web01/:/usr/local/apache2/htdocs/:ro"})
+	unifiedMounts := make(map[string]spec.Mount)
+	for dst, mount := range volumeMounts {
+		fmt.Println(mount.Type == mountFlag)
+		mount.Type = mountFlag
+		unifiedMounts[dst] = mount
+	}
+
+	finalMounts := make([]spec.Mount, 0, 1)
+	for _, mount := range unifiedMounts {
+		if mount.Type == define.TypeBind {
+			absSrc, _ := filepath.Abs(mount.Source)
+			mount.Source = absSrc
+		}
+		finalMounts = append(finalMounts, mount)
+	}
+
 	// 创建一个容器
 	// create a container
-	s := specgen.NewSpecGenerator("quay.io/libpod/alpine_nginx:latest", false)
-	s.Name = "foobar"
+	s := specgen.NewSpecGenerator(imageUrl, false)
+	s.Name = "web01"
+	s.Mounts = finalMounts
 	createResponse, err := containers.CreateWithSpec(conn, s, nil)
 	if err != nil {
 		fmt.Println(err)
@@ -66,9 +95,10 @@ func main() {
 	// 删除镜像
 	// reomve an image
 	ctx := context.Background()
-	_, errs := images.Remove(ctx, []string{"quay.io/libpod/alpine_nginx:latest"}, nil)
+	_, errs := images.Remove(ctx, []string{imageUrl}, nil)
 	if err != nil {
 		fmt.Println(errs)
 		os.Exit(1)
 	}
+
 }
