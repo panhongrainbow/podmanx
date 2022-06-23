@@ -3,15 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/containers/podman/v3/libpod/define"
 	nettypes "github.com/containers/podman/v3/libpod/network/types"
 	"github.com/containers/podman/v3/pkg/bindings"
 	"github.com/containers/podman/v3/pkg/bindings/containers"
 	"github.com/containers/podman/v3/pkg/bindings/images"
 	"github.com/containers/podman/v3/pkg/specgen"
-	spec "github.com/opencontainers/runtime-spec/specs-go"
 	"os"
-	"path/filepath"
 )
 
 const (
@@ -43,7 +40,7 @@ func main() {
 
 	// 挂载目录
 	// mount a directory
-	mountFlag := define.TypeBind
+	/*mountFlag := define.TypeBind
 	volumeMounts, _, _, _ := specgen.GenVolumeMounts([]string{"/home/panhong/web01/:/usr/local/apache2/htdocs/:ro"})
 	unifiedMounts := make(map[string]spec.Mount)
 	for dst, mount := range volumeMounts {
@@ -59,6 +56,17 @@ func main() {
 			mount.Source = absSrc
 		}
 		finalMounts = append(finalMounts, mount)
+	}*/
+
+	_, volumeVolumes, _, _ := specgen.GenVolumeMounts([]string{"web01:/usr/local/apache2/htdocs/"})
+	unifiedVolumes := make(map[string]*specgen.NamedVolume)
+	for dest, volume := range volumeVolumes {
+		unifiedVolumes[dest] = volume
+	}
+
+	finalVolumes := make([]*specgen.NamedVolume, 0, 1)
+	for _, volume := range unifiedVolumes {
+		finalVolumes = append(finalVolumes, volume)
 	}
 
 	// 设置 port mapping
@@ -71,7 +79,8 @@ func main() {
 	// create a container
 	s := specgen.NewSpecGenerator(imageUrl, false)
 	s.Name = "web01"
-	s.Mounts = finalMounts
+	// s.Mounts = finalMounts
+	s.Volumes = finalVolumes
 	s.PortMappings = portMapping
 	createResponse, err := containers.CreateWithSpec(conn, s, nil)
 	if err != nil {
@@ -85,6 +94,8 @@ func main() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+
+	return
 
 	// 停止容器
 	// stop the container
@@ -109,4 +120,24 @@ func main() {
 		os.Exit(1)
 	}
 
+	// 创建一个卷
+	// create a volume
+	// volumeName := "web01"
+	/*ctx := context.Background()
+	volumeOptions := entities.VolumeCreateOptions{
+		Name: volumeName,
+	}
+	_, err = volumes.Create(conn, volumeOptions, nil)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}*/
+
+	// 删除卷
+	// remove a volume
+	/*err = volumes.Remove(conn, volumeName, nil)
+	if err != nil {
+		fmt.Println(errs)
+		os.Exit(1)
+	}*/
 }
