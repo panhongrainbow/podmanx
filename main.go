@@ -14,7 +14,12 @@ import (
 const (
 	// imageUrl 为去拉取的镜像地址
 	// imageUrl is the URL of the image to be pulled.
-	imageUrl = "docker.io/library/httpd:latest"
+	// imageUrl = "docker.io/library/httpd:latest"
+
+	// 测试用的命令
+	// test command
+	// podman run --detach --name some-mariadb --env MARIADB_USER=xiaomi --env MARIADB_PASSWORD=12345 --env MARIADB_ROOT_PASSWORD=12345  docker.io/library/mariadb:latest
+	imageUrl = "docker.io/library/mariadb:latest"
 )
 
 // 先测试再封装
@@ -38,7 +43,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// 挂载目录
+	// >>>>> >>>>> >>>>> 挂载目录
 	// mount a directory
 	/*mountFlag := define.TypeBind
 	volumeMounts, _, _, _ := specgen.GenVolumeMounts([]string{"/home/panhong/web01/:/usr/local/apache2/htdocs/:ro"})
@@ -58,7 +63,9 @@ func main() {
 		finalMounts = append(finalMounts, mount)
 	}*/
 
-	_, volumeVolumes, _, _ := specgen.GenVolumeMounts([]string{"web01:/usr/local/apache2/htdocs/"})
+	// >>>>> >>>>> >>>>> 挂载卷
+	// mount a volume
+	/*_, volumeVolumes, _, _ := specgen.GenVolumeMounts([]string{"web01:/usr/local/apache2/htdocs/"})
 	unifiedVolumes := make(map[string]*specgen.NamedVolume)
 	for dest, volume := range volumeVolumes {
 		unifiedVolumes[dest] = volume
@@ -67,34 +74,48 @@ func main() {
 	finalVolumes := make([]*specgen.NamedVolume, 0, 1)
 	for _, volume := range unifiedVolumes {
 		finalVolumes = append(finalVolumes, volume)
-	}
+	}*/
 
 	// 设置 port mapping
 	// make port mapping
 	portMapping := make([]nettypes.PortMapping, 1, 1)
 	portMapping[0].HostPort = 8080
-	portMapping[0].ContainerPort = 80
+	portMapping[0].ContainerPort = 3306 // or 80
 
 	// 创建一个容器
 	// create a container
 	s := specgen.NewSpecGenerator(imageUrl, false)
 	s.Name = "web01"
 	// s.Mounts = finalMounts
-	s.Volumes = finalVolumes
+	// s.Volumes = finalVolumes
 	s.PortMappings = portMapping
+
+	s.Env = map[string]string{
+		"MARIADB_USER":          "xiaomi",
+		"MARIADB_PASSWORD":      "12345",
+		"MARIADB_ROOT_PASSWORD": "12345",
+	}
+
 	createResponse, err := containers.CreateWithSpec(conn, s, nil)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
+	// 分离容器的命令
+	// detach container command
+	detachKeys := "ctrl-a"
+	startOptions := containers.StartOptions{DetachKeys: &detachKeys}
+
 	// 启动容器
 	// start the container
-	if err := containers.Start(conn, createResponse.ID, nil); err != nil {
+	if err := containers.Start(conn, createResponse.ID, &startOptions); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
+	// 先中断
+	// interrupt
 	return
 
 	// 停止容器
