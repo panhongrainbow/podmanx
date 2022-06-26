@@ -7,6 +7,8 @@ import (
 	"github.com/containers/podman/v3/pkg/bindings"
 	"github.com/containers/podman/v3/pkg/bindings/containers"
 	"github.com/containers/podman/v3/pkg/bindings/images"
+	"github.com/containers/podman/v3/pkg/bindings/pods"
+	"github.com/containers/podman/v3/pkg/domain/entities"
 	"github.com/containers/podman/v3/pkg/specgen"
 	"os"
 )
@@ -42,6 +44,32 @@ func main() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+
+	// >>>>> >>>>> >>>>> 建立夹子
+	// create a pod
+	pspec := entities.PodSpec{
+		PodSpecGen: specgen.PodSpecGenerator{
+			PodBasicConfig: specgen.PodBasicConfig{
+				Name: "test",
+			},
+			PodNetworkConfig:  specgen.PodNetworkConfig{},
+			PodCgroupConfig:   specgen.PodCgroupConfig{},
+			PodResourceConfig: specgen.PodResourceConfig{},
+			InfraContainerSpec: &specgen.SpecGenerator{
+				specgen.ContainerBasicConfig{},
+				specgen.ContainerStorageConfig{},
+				specgen.ContainerSecurityConfig{},
+				specgen.ContainerCgroupConfig{},
+				specgen.ContainerNetworkConfig{},
+				specgen.ContainerResourceConfig{},
+				specgen.ContainerHealthCheckConfig{},
+			},
+		},
+	}
+
+	preport, _ := pods.CreatePodFromSpec(conn, &pspec)
+
+	_, _ = pods.Start(conn, preport.Id, nil)
 
 	// >>>>> >>>>> >>>>> 挂载目录
 	// mount a directory
