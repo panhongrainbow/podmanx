@@ -16,12 +16,12 @@ import (
 const (
 	// imageUrl 为去拉取的镜像地址
 	// imageUrl is the URL of the image to be pulled.
-	// imageUrl = "docker.io/library/httpd:latest"
+	imageUrl = "docker.io/library/httpd:latest"
 
 	// 测试用的命令
 	// test command
 	// podman run --detach --name some-mariadb --env MARIADB_USER=xiaomi --env MARIADB_PASSWORD=12345 --env MARIADB_ROOT_PASSWORD=12345  docker.io/library/mariadb:latest
-	imageUrl = "docker.io/library/mariadb:latest"
+	// imageUrl = "docker.io/library/mariadb:latest"
 )
 
 // 先测试再封装
@@ -45,14 +45,21 @@ func main() {
 		os.Exit(1)
 	}
 
+	portMapping := make([]nettypes.PortMapping, 1, 1)
+	portMapping[0].HostPort = 8080
+	portMapping[0].ContainerPort = 80 // or 3306
+
 	// >>>>> >>>>> >>>>> 建立夹子
 	// create a pod
 	pspec := entities.PodSpec{
 		PodSpecGen: specgen.PodSpecGenerator{
 			PodBasicConfig: specgen.PodBasicConfig{
-				Name: "test",
+				Name: "some-pod",
 			},
-			PodNetworkConfig:  specgen.PodNetworkConfig{},
+			PodNetworkConfig: specgen.PodNetworkConfig{
+				// StaticIP:     &net.IP{127, 0, 0, 1},
+				PortMappings: portMapping,
+			},
 			PodCgroupConfig:   specgen.PodCgroupConfig{},
 			PodResourceConfig: specgen.PodResourceConfig{},
 			InfraContainerSpec: &specgen.SpecGenerator{
@@ -106,9 +113,12 @@ func main() {
 
 	// 设置 port mapping
 	// make port mapping
-	portMapping := make([]nettypes.PortMapping, 1, 1)
-	portMapping[0].HostPort = 8080
-	portMapping[0].ContainerPort = 3306 // or 80
+	// 使用 pod 时，关闭网路设置
+	/*
+		portMapping := make([]nettypes.PortMapping, 1, 1)
+		portMapping[0].HostPort = 8080
+		portMapping[0].ContainerPort = 80 // or 3306
+	*/
 
 	// 创建一个容器
 	// create a container
@@ -116,14 +126,22 @@ func main() {
 	s.Name = "web01"
 	// s.Mounts = finalMounts
 	// s.Volumes = finalVolumes
-	s.PortMappings = portMapping
+	// s.PortMappings = portMapping // 使用 pod 时，关闭网路设置
 
+	// 容器加入 pod
+	// add a container to a pod
+	s.Pod = preport.Id
+
+	// 设定帐号密码
+	// set account and password
 	s.Env = map[string]string{
 		"MARIADB_USER":          "xiaomi",
 		"MARIADB_PASSWORD":      "12345",
 		"MARIADB_ROOT_PASSWORD": "12345",
 	}
 
+	// 创建容器的 spec
+	// create a container's spec
 	createResponse, err := containers.CreateWithSpec(conn, s, nil)
 	if err != nil {
 		fmt.Println(err)
