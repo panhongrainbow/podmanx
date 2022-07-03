@@ -6,6 +6,9 @@ import (
 	"github.com/containers/podman/v3/pkg/bindings"
 	"github.com/containers/podman/v3/pkg/bindings/containers"
 	"github.com/containers/podman/v3/pkg/bindings/images"
+	"github.com/containers/podman/v3/pkg/bindings/pods"
+	"github.com/containers/podman/v3/pkg/domain/entities"
+	"github.com/containers/podman/v3/pkg/specgen"
 	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
@@ -87,8 +90,49 @@ func TestEcho(t *testing.T) {
 	}
 
 	if len(listContainer) > 0 {
-		fmt.Println("plan exists")
+		fmt.Println("plan exists ?", exists)
+		exists = true
+		for _, container := range listContainer {
+			if value, ok := container.Labels["io.podman.compose.config-hash"]; ok == true {
+				fmt.Println("hash: ", value)
+			}
+		}
+		// 存在就中断
+		// if it exists, stop all
+		os.Exit(1)
 	} else {
-		fmt.Println("plan not exists")
+		fmt.Println("plan exists ?", exists)
+		exists = false
 	}
+
+	// >>>>> mimic "podman pod create --name=pod_echo --infra=false --share="
+	// >>>>> 相对于 "podman pod create --name=pod_echo --infra=false --share="
+
+	// 建立夹子
+	// create a pod
+
+	pspec := entities.PodSpec{
+		PodSpecGen: specgen.PodSpecGenerator{
+			PodBasicConfig: specgen.PodBasicConfig{
+				Name:    "pod_echo",
+				NoInfra: true,
+			},
+			PodCgroupConfig:   specgen.PodCgroupConfig{},
+			PodResourceConfig: specgen.PodResourceConfig{},
+			InfraContainerSpec: &specgen.SpecGenerator{
+				specgen.ContainerBasicConfig{},
+				specgen.ContainerStorageConfig{},
+				specgen.ContainerSecurityConfig{},
+				specgen.ContainerCgroupConfig{},
+				specgen.ContainerNetworkConfig{},
+				specgen.ContainerResourceConfig{},
+				specgen.ContainerHealthCheckConfig{},
+			},
+		},
+	}
+
+	preport, _ := pods.CreatePodFromSpec(conn, &pspec)
+
+	_, _ = pods.Start(conn, preport.Id, nil)
+
 }
