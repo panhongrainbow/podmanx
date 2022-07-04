@@ -6,6 +6,7 @@ import (
 	"github.com/containers/podman/v3/pkg/bindings"
 	"github.com/containers/podman/v3/pkg/bindings/containers"
 	"github.com/containers/podman/v3/pkg/bindings/images"
+	"github.com/containers/podman/v3/pkg/bindings/network"
 	"github.com/containers/podman/v3/pkg/bindings/pods"
 	"github.com/containers/podman/v3/pkg/domain/entities"
 	"github.com/containers/podman/v3/pkg/specgen"
@@ -90,8 +91,8 @@ func TestEcho(t *testing.T) {
 	}
 
 	if len(listContainer) > 0 {
-		fmt.Println("plan exists ?", exists)
 		exists = true
+		fmt.Println("plan exists ?", exists)
 		for _, container := range listContainer {
 			if value, ok := container.Labels["io.podman.compose.config-hash"]; ok == true {
 				fmt.Println("hash: ", value)
@@ -101,8 +102,9 @@ func TestEcho(t *testing.T) {
 		// if it exists, stop all
 		os.Exit(1)
 	} else {
-		fmt.Println("plan exists ?", exists)
 		exists = false
+		fmt.Println("plan exists ?", exists)
+
 	}
 
 	// >>>>> mimic "podman pod create --name=pod_echo --infra=false --share="
@@ -117,22 +119,33 @@ func TestEcho(t *testing.T) {
 				Name:    "pod_echo",
 				NoInfra: true,
 			},
-			PodCgroupConfig:   specgen.PodCgroupConfig{},
-			PodResourceConfig: specgen.PodResourceConfig{},
-			InfraContainerSpec: &specgen.SpecGenerator{
-				specgen.ContainerBasicConfig{},
-				specgen.ContainerStorageConfig{},
-				specgen.ContainerSecurityConfig{},
-				specgen.ContainerCgroupConfig{},
-				specgen.ContainerNetworkConfig{},
-				specgen.ContainerResourceConfig{},
-				specgen.ContainerHealthCheckConfig{},
-			},
+			PodCgroupConfig:    specgen.PodCgroupConfig{},
+			PodResourceConfig:  specgen.PodResourceConfig{},
+			InfraContainerSpec: &specgen.SpecGenerator{},
 		},
 	}
 
-	preport, _ := pods.CreatePodFromSpec(conn, &pspec)
+	preport, err := pods.CreatePodFromSpec(conn, &pspec)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 
-	_, _ = pods.Start(conn, preport.Id, nil)
+	_, err = pods.Start(conn, preport.Id, nil)
+	if err.Error() != "" {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 
+	// >>>>> mimic "podman network exists echo_default"
+	// >>>>> 相对于 "podman network exists echo_default"
+
+	// check if the network exists
+	// 检查网络是否存在
+	exists, err = network.Exists(conn, "echo_default", nil)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	fmt.Println("network exists ?", exists)
 }
