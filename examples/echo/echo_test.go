@@ -110,8 +110,8 @@ func TestEcho(t *testing.T) {
 	// >>>>> mimic "podman pod create --name=pod_echo --infra=false --share="
 	// >>>>> 相对于 "podman pod create --name=pod_echo --infra=false --share="
 
-	// 建立夹子
 	// create a pod
+	// 建立夹子
 
 	pspec := entities.PodSpec{
 		PodSpecGen: specgen.PodSpecGenerator{
@@ -148,4 +148,39 @@ func TestEcho(t *testing.T) {
 		os.Exit(1)
 	}
 	fmt.Println("network exists ?", exists)
+
+	// crate a network if it doesn't exist
+	// 如果不存在，重新建立网路
+	if !exists {
+
+		// >>>>> mimic "podman network create --label io.podman.compose.project=echo --label com.docker.compose.project=echo echo_default"
+		// >>>>> 相对于 "podman network create --label io.podman.compose.project=echo --label com.docker.compose.project=echo echo_default"
+
+		// create a network
+		// 创建网路
+		nw := "echo_default"
+		createOptions := network.CreateOptions{
+			Name: &nw,
+			Labels: map[string]string{
+				"io.podman.compose.project":  "echo",
+				"com.docker.compose.project": "echo",
+			},
+		}
+
+		path, err := network.Create(conn, &createOptions)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+		fmt.Println("network path ", path.Filename)
+
+		// check if the network exists after create it
+		// 在创建网路完成后，再检查网络是否存在
+		exists, err = network.Exists(conn, "echo_default", nil)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+		fmt.Println("network exists ?", exists)
+	}
 }
