@@ -3,6 +3,7 @@ package echo
 import (
 	"context"
 	"fmt"
+	nettypes "github.com/containers/podman/v3/libpod/network/types"
 	"github.com/containers/podman/v3/pkg/bindings"
 	"github.com/containers/podman/v3/pkg/bindings/containers"
 	"github.com/containers/podman/v3/pkg/bindings/images"
@@ -182,5 +183,60 @@ func TestEcho(t *testing.T) {
 			os.Exit(1)
 		}
 		fmt.Println("network exists ?", exists)
+	}
+
+	// >>>>> mimic "podman create --name=echo_web_1 --pod=pod_echo --label io.podman.compose.config-hash=57c9635d928f88954e01491e81ca0f9049014d0d205f0fb03c951e2fe09d582a --label io.podman.compose.project=echo --label io.podman.compose.version=1.0.4 --label com.docker.compose.project=echo --label com.docker.compose.project.working_dir=/home/panhong/go/src/github.com/panhongrainbow/podmanx/examples/echo --label com.docker.compose.project.config_files=docker-compose.yaml --label com.docker.compose.container-number=1 --label com.docker.compose.service=web --net echo_default --network-alias web -p 8080:8080 k8s.gcr.io/echoserver:1.4"
+	// >>>>> 相对于 "podman create --name=echo_web_1 --pod=pod_echo --label io.podman.compose.config-hash=57c9635d928f88954e01491e81ca0f9049014d0d205f0fb03c951e2fe09d582a --label io.podman.compose.project=echo --label io.podman.compose.version=1.0.4 --label com.docker.compose.project=echo --label com.docker.compose.project.working_dir=/home/panhong/go/src/github.com/panhongrainbow/podmanx/examples/echo --label com.docker.compose.project.config_files=docker-compose.yaml --label com.docker.compose.container-number=1 --label com.docker.compose.service=web --net echo_default --network-alias web -p 8080:8080 k8s.gcr.io/echoserver:1.4"
+
+	// create a container
+	// 创建一个容器
+	s := specgen.NewSpecGenerator("k8s.gcr.io/echoserver:1.4", false)
+	s.Name = "echo_web_1"
+
+	// set network config
+	// 设定 network config
+	portMapping := make([]nettypes.PortMapping, 1, 1)
+	portMapping[0].HostPort = 8080
+	portMapping[0].ContainerPort = 8080
+
+	s.ContainerNetworkConfig = specgen.ContainerNetworkConfig{
+		CNINetworks:    []string{"echo_default"},
+		NetworkOptions: map[string][]string{},
+		Aliases: map[string][]string{
+			"echo_default": {"web"},
+		},
+		PortMappings: portMapping,
+	}
+
+	// add a container to a pod
+	// 容器加入 pod
+	s.Pod = preport.Id
+
+	// set the tags
+	// 设定标签
+	s.Labels = map[string]string{
+		"io.podman.compose.config-hash":           "57c9635d928f88954e01491e81ca0f9049014d0d205f0fb03c951e2fe09d582a",
+		"io.podman.compose.project":               "echo",
+		"io.podman.compose.version":               "1.0.4",
+		"com.docker.compose.project":              "echo",
+		"com.docker.compose.project.working_dir":  "/home/panhong/go/src/github.com/panhongrainbow/podmanx/examples/echo",
+		"com.docker.compose.project.config_files": "docker-compose.yaml",
+		"com.docker.compose.container-number":     "1",
+		"com.docker.compose.service":              "web",
+	}
+
+	// create a container's spec
+	// 创建容器的 spec
+	createResponse, err := containers.CreateWithSpec(conn, s, nil)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	// start the container
+	// 启动容器
+	if err := containers.Start(conn, createResponse.ID, nil); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
 	}
 }
