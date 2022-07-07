@@ -76,16 +76,16 @@ func TestEcho(t *testing.T) {
 	// >>>>> mimic "podman ps --filter label=io.podman.compose.project=echo -a --format '{{ index .Labels "io.podman.compose.config-hash"}}'"
 	// >>>>> 相对于 "podman ps --filter label=io.podman.compose.project=echo -a --format '{{ index .Labels "io.podman.compose.config-hash"}}'"
 
-	// 启动计划是否已经存在
+	// 确认计划是否已经存在
 	// check if the plan exists
 
-	listOptions := containers.ListOptions{
+	containerListOptions := containers.ListOptions{
 		Filters: map[string][]string{
 			"label": {"io.podman.compose.project=echo"},
 		},
 	}
 
-	listContainer, err := containers.List(conn, &listOptions)
+	listContainer, err := containers.List(conn, &containerListOptions)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -105,37 +105,103 @@ func TestEcho(t *testing.T) {
 	} else {
 		exists = false
 		fmt.Println("plan exists ?", exists)
-
 	}
 
-	// >>>>> mimic "podman pod create --name=pod_echo --infra=false --share="
-	// >>>>> 相对于 "podman pod create --name=pod_echo --infra=false --share="
+	// >>>>> add "podman pod ls --format '{{ index .Labels "io.podman.compose.project"}}'"
+	// >>>>> 新增 "podman pod ls --format '{{ index .Labels "io.podman.compose.project"}}'"
 
-	// create a pod
-	// 建立夹子
-
-	pspec := entities.PodSpec{
-		PodSpecGen: specgen.PodSpecGenerator{
-			PodBasicConfig: specgen.PodBasicConfig{
-				Name:    "pod_echo",
-				NoInfra: true,
-			},
-			PodCgroupConfig:    specgen.PodCgroupConfig{},
-			PodResourceConfig:  specgen.PodResourceConfig{},
-			InfraContainerSpec: &specgen.SpecGenerator{},
+	podListOptions := pods.ListOptions{
+		map[string][]string{
+			"label": {"io.podman.compose.project=echo"},
 		},
 	}
 
-	preport, err := pods.CreatePodFromSpec(conn, &pspec)
+	listPods, err := pods.List(conn, &podListOptions)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
-	_, err = pods.Start(conn, preport.Id, nil)
-	if err.Error() != "" {
-		fmt.Println(err)
-		os.Exit(1)
+	// crate a pod if it doesn't exist
+	// 如果不存在，重新建立夹子
+
+	exists = false
+	podID := ""
+	for i := 0; i < len(listPods); i++ {
+		exists = true
+		fmt.Println("pod exists ?", exists, "(", listPods[i].Name, ")")
+	}
+
+	// crate a pod if it doesn't exist
+	// 如果不存在，重新建立夹子
+	if !exists {
+
+		// >>>>> mimic "podman pod create --label io.podman.compose.project=echo --name=pod_echo --infra=false --share=" (adjusted)
+		// >>>>> 相对于 "podman pod create --label io.podman.compose.project=echo --name=pod_echo --infra=false --share=" (调整)
+		// ( original one: "podman pod create --name=pod_echo --infra=false --share=" )
+
+		// create a pod
+		// 建立夹子
+
+		pspec := entities.PodSpec{
+			PodSpecGen: specgen.PodSpecGenerator{
+				PodBasicConfig: specgen.PodBasicConfig{
+					Name:    "pod_echo",
+					NoInfra: true,
+					Labels: map[string]string{
+						"io.podman.compose.project": "echo",
+					},
+				},
+				PodCgroupConfig:    specgen.PodCgroupConfig{},
+				PodResourceConfig:  specgen.PodResourceConfig{},
+				InfraContainerSpec: &specgen.SpecGenerator{},
+			},
+		}
+
+		preport, err := pods.CreatePodFromSpec(conn, &pspec)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
+		// renew the pod's ID
+		// 更新夹子的编号
+		podID = preport.Id
+
+		_, err = pods.Start(conn, podID, nil)
+		if err.Error() != "" {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
+		// 再一次检查夹子是否存在
+		// check the pod exists again
+		listPods, err := pods.List(conn, &podListOptions)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
+		// crate a pod if it doesn't exist
+		// 如果不存在，重新建立夹子
+		if len(listPods) > 0 {
+			exists = true
+			fmt.Println("pod exists ?", exists)
+		} else {
+			exists = false
+			fmt.Println("pod exists ?", exists)
+		}
+
+		// it must exist金after create a pod
+		// 创建夹子后，检查夹子必须存在
+		require.Equal(t, true, exists)
+
+		// list the pod's name
+		// 列出夹子的名称
+		for i := 0; i < len(listPods); i++ {
+			fmt.Println("pod exists ?", exists, "(", listPods[i].Name, ")")
+		}
+
 	}
 
 	// >>>>> mimic "podman network exists echo_default"
@@ -210,7 +276,7 @@ func TestEcho(t *testing.T) {
 
 	// add a container to a pod
 	// 容器加入 pod
-	s.Pod = preport.Id
+	s.Pod = podID
 
 	// set the tags
 	// 设定标签
