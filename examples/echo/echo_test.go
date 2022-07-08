@@ -12,7 +12,10 @@ import (
 	"github.com/containers/podman/v3/pkg/domain/entities"
 	"github.com/containers/podman/v3/pkg/specgen"
 	"github.com/stretchr/testify/require"
+	"net/http"
+	"net/url"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -76,63 +79,72 @@ func TestEcho(t *testing.T) {
 	// >>>>> mimic "podman ps --filter label=io.podman.compose.project=echo -a --format '{{ index .Labels "io.podman.compose.config-hash"}}'"
 	// >>>>> 相对于 "podman ps --filter label=io.podman.compose.project=echo -a --format '{{ index .Labels "io.podman.compose.config-hash"}}'"
 
-	// 确认计划是否已经存在
-	// check if the plan exists
-
+	// prepare for listing containers
+	// 准备列出容器的过滤条件
 	containerListOptions := containers.ListOptions{
 		Filters: map[string][]string{
 			"label": {"io.podman.compose.project=echo"},
 		},
 	}
 
+	// check if the containers exists in the plan
+	// 确认计划内的容器是否已经存在
 	listContainer, err := containers.List(conn, &containerListOptions)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
+	// list all containers in the plan
+	// 显示所有在计划中的容器
 	if len(listContainer) > 0 {
 		exists = true
-		fmt.Println("plan exists ?", exists)
 		for _, container := range listContainer {
 			if value, ok := container.Labels["io.podman.compose.config-hash"]; ok == true {
 				fmt.Println("hash: ", value)
 			}
 		}
-		// 存在就中断
-		// if it exists, stop all
-		os.Exit(1)
 	} else {
 		exists = false
-		fmt.Println("plan exists ?", exists)
+	}
+	fmt.Println("plan exists ?", exists)
+
+	// 容器存在就中断
+	// if it exists, stop all
+	if exists == true {
+		fmt.Println("exit !")
+		os.Exit(1)
 	}
 
 	// >>>>> add "podman pod ls --format '{{ index .Labels "io.podman.compose.project"}}'"
 	// >>>>> 新增 "podman pod ls --format '{{ index .Labels "io.podman.compose.project"}}'"
 
+	// prepare for listing pods
+	// 准备列出夹子的过滤条件
 	podListOptions := pods.ListOptions{
 		map[string][]string{
 			"label": {"io.podman.compose.project=echo"},
 		},
 	}
 
+	// check if the pods exists in the plan
+	// 确认计划内的夹子是否已经存在
 	listPods, err := pods.List(conn, &podListOptions)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
-	// crate a pod if it doesn't exist
-	// 如果不存在，重新建立夹子
-
+	// list all pods in the plan
+	// 显示所有在计划中的夹子
 	exists = false
-	podID := ""
+	podID := "" // pod's ID 夹子的编号
 	for i := 0; i < len(listPods); i++ {
 		exists = true
 		fmt.Println("pod exists ?", exists, "(", listPods[i].Name, ")")
 	}
 
-	// crate a pod if it doesn't exist
+	// create a pod if it doesn't exist
 	// 如果不存在，重新建立夹子
 	if !exists {
 
@@ -140,9 +152,8 @@ func TestEcho(t *testing.T) {
 		// >>>>> 相对于 "podman pod create --label io.podman.compose.project=echo --name=pod_echo --infra=false --share=" (调整)
 		// ( original one: "podman pod create --name=pod_echo --infra=false --share=" )
 
-		// create a pod
-		// 建立夹子
-
+		// prepare data for creating a pod
+		// 准备建立夹子的资料
 		pspec := entities.PodSpec{
 			PodSpecGen: specgen.PodSpecGenerator{
 				PodBasicConfig: specgen.PodBasicConfig{
@@ -158,6 +169,8 @@ func TestEcho(t *testing.T) {
 			},
 		}
 
+		// create a pod
+		// 建立夹子
 		preport, err := pods.CreatePodFromSpec(conn, &pspec)
 		if err != nil {
 			fmt.Println(err)
@@ -168,14 +181,16 @@ func TestEcho(t *testing.T) {
 		// 更新夹子的编号
 		podID = preport.Id
 
+		// the pod starts
+		// 启动夹子
 		_, err = pods.Start(conn, podID, nil)
 		if err.Error() != "" {
 			fmt.Println(err)
 			os.Exit(1)
 		}
 
+		// check if the pod exists again
 		// 再一次检查夹子是否存在
-		// check the pod exists again
 		listPods, err := pods.List(conn, &podListOptions)
 		if err != nil {
 			fmt.Println(err)
@@ -186,22 +201,20 @@ func TestEcho(t *testing.T) {
 		// 如果不存在，重新建立夹子
 		if len(listPods) > 0 {
 			exists = true
-			fmt.Println("pod exists ?", exists)
 		} else {
 			exists = false
-			fmt.Println("pod exists ?", exists)
 		}
+		fmt.Println("pod exists after creating ?", exists)
 
-		// it must exist金after create a pod
+		// it must exist after creating a pod
 		// 创建夹子后，检查夹子必须存在
 		require.Equal(t, true, exists)
 
 		// list the pod's name
 		// 列出夹子的名称
 		for i := 0; i < len(listPods); i++ {
-			fmt.Println("pod exists ?", exists, "(", listPods[i].Name, ")")
+			fmt.Println("pod: ", listPods[i].Name)
 		}
-
 	}
 
 	// >>>>> mimic "podman network exists echo_default"
@@ -223,8 +236,8 @@ func TestEcho(t *testing.T) {
 		// >>>>> mimic "podman network create --label io.podman.compose.project=echo --label com.docker.compose.project=echo echo_default"
 		// >>>>> 相对于 "podman network create --label io.podman.compose.project=echo --label com.docker.compose.project=echo echo_default"
 
-		// create a network
-		// 创建网路
+		// prepare data for creating a network
+		// 准备创建网路的资料
 		nw := "echo_default"
 		createOptions := network.CreateOptions{
 			Name: &nw,
@@ -234,6 +247,8 @@ func TestEcho(t *testing.T) {
 			},
 		}
 
+		// create a network
+		// 创建网路
 		path, err := network.Create(conn, &createOptions)
 		if err != nil {
 			fmt.Println(err)
@@ -241,26 +256,26 @@ func TestEcho(t *testing.T) {
 		}
 		fmt.Println("network path ", path.Filename)
 
-		// check if the network exists after create it
+		// check if the network exists after creating it
 		// 在创建网路完成后，再检查网络是否存在
 		exists, err = network.Exists(conn, "echo_default", nil)
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
 		}
-		fmt.Println("network exists ?", exists)
+		fmt.Println("network exists after creating ?", exists)
 	}
 
 	// >>>>> mimic "podman create --name=echo_web_1 --pod=pod_echo --label io.podman.compose.config-hash=57c9635d928f88954e01491e81ca0f9049014d0d205f0fb03c951e2fe09d582a --label io.podman.compose.project=echo --label io.podman.compose.version=1.0.4 --label com.docker.compose.project=echo --label com.docker.compose.project.working_dir=/home/panhong/go/src/github.com/panhongrainbow/podmanx/examples/echo --label com.docker.compose.project.config_files=docker-compose.yaml --label com.docker.compose.container-number=1 --label com.docker.compose.service=web --net echo_default --network-alias web -p 8080:8080 k8s.gcr.io/echoserver:1.4"
 	// >>>>> 相对于 "podman create --name=echo_web_1 --pod=pod_echo --label io.podman.compose.config-hash=57c9635d928f88954e01491e81ca0f9049014d0d205f0fb03c951e2fe09d582a --label io.podman.compose.project=echo --label io.podman.compose.version=1.0.4 --label com.docker.compose.project=echo --label com.docker.compose.project.working_dir=/home/panhong/go/src/github.com/panhongrainbow/podmanx/examples/echo --label com.docker.compose.project.config_files=docker-compose.yaml --label com.docker.compose.container-number=1 --label com.docker.compose.service=web --net echo_default --network-alias web -p 8080:8080 k8s.gcr.io/echoserver:1.4"
 
-	// create a container
-	// 创建一个容器
+	// prepare data for creating a container
+	// 准备创建容器的资料
 	s := specgen.NewSpecGenerator("k8s.gcr.io/echoserver:1.4", false)
 	s.Name = "echo_web_1"
 
-	// set network config
-	// 设定 network config
+	// set the pod's network
+	// 设定容器网路配置
 	portMapping := make([]nettypes.PortMapping, 1, 1)
 	portMapping[0].HostPort = 8080
 	portMapping[0].ContainerPort = 8080
@@ -274,12 +289,12 @@ func TestEcho(t *testing.T) {
 		PortMappings: portMapping,
 	}
 
-	// add a container to a pod
-	// 容器加入 pod
+	// add a container to a pod by using pod's id
+	// 容器利用编号加入到夹子
 	s.Pod = podID
 
-	// set the tags
-	// 设定标签
+	// set the container's tags
+	// 设定容器标签
 	s.Labels = map[string]string{
 		"io.podman.compose.config-hash":           "57c9635d928f88954e01491e81ca0f9049014d0d205f0fb03c951e2fe09d582a",
 		"io.podman.compose.project":               "echo",
@@ -291,9 +306,9 @@ func TestEcho(t *testing.T) {
 		"com.docker.compose.service":              "web",
 	}
 
-	// create a container's spec
-	// 创建容器的 spec
-	createResponse, err := containers.CreateWithSpec(conn, s, nil)
+	// create a container spec
+	// 创建一个容器规格
+	containerCreateResponse, err := containers.CreateWithSpec(conn, s, nil)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -301,8 +316,43 @@ func TestEcho(t *testing.T) {
 
 	// start the container
 	// 启动容器
-	if err := containers.Start(conn, createResponse.ID, nil); err != nil {
+	if err := containers.Start(conn, containerCreateResponse.ID, nil); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+
+	// >>>>> mimic "curl -X POST -d "foobar" http://localhost:8080/; echo"
+	// >>>>> 相对于 "curl -X POST -d "foobar" http://localhost:8080/; echo"
+
+	// connect to container
+	// 进行连线
+	params := url.Values{}
+	params.Add("foobar", ``)
+	body := strings.NewReader(params.Encode())
+	req, err := http.NewRequest("POST", "http://localhost:8080/;", body)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	require.Equal(t, "200 OK", resp.Status)
+
+	fmt.Println("connection successful")
+
+	// >>>>> mimic ""
+	// >>>>> 相对于 ""
+
+	// stop the container
+	// 停止容器
+
 }
