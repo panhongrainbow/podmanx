@@ -370,5 +370,39 @@ func TestEcho(t *testing.T) {
 
 	// stop the container
 	// 停止容器
-	containers.Stop(conn, containerCreateResponse.ID, &stopOptions)
+	err = containers.Stop(conn, containerCreateResponse.ID, &stopOptions)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	// >>>>> mimic "podman rm echo_web_1"
+	// >>>>> 相对于 "podman rm echo_web_1"
+
+	// remove the container
+	// 删除容器
+	err = containers.Remove(conn, containerCreateResponse.ID, nil)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	fmt.Println("remove container successful")
+
+	// >>>>> mimic "podman pod rm pod_echo"
+	// >>>>> 相对于 "podman pod rm pod_echo"
+	_, err = pods.Remove(conn, podID, nil)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	fmt.Println("remove pods successful")
+
+	// >>>>> mimic "podman pod rm pod_echo"
+	// >>>>> 相对于 "podman pod rm pod_echo"
+	_, err = network.Remove(conn, "echo_default", nil)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	fmt.Println("remove network successful")
 }
