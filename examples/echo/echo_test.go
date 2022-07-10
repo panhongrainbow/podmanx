@@ -21,6 +21,9 @@ import (
 
 func TestEcho(t *testing.T) {
 
+	// >>>>> >>>>> >>>>> establish
+	// >>>>> >>>>> >>>>> 创建部份
+
 	// >>>>> mimic "podman --version"
 	// >>>>> 相对于 "podman --version"
 
@@ -336,6 +339,9 @@ func TestEcho(t *testing.T) {
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
+	// >>>>> >>>>> >>>>> testing
+	// >>>>> >>>>> >>>>> 测试部份
+
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		fmt.Println(err)
@@ -349,10 +355,20 @@ func TestEcho(t *testing.T) {
 
 	fmt.Println("connection successful")
 
-	// >>>>> mimic ""
-	// >>>>> 相对于 ""
+	// >>>>> >>>>> >>>>> tear down
+	// >>>>> >>>>> >>>>> 拆除部份
+
+	// >>>>> mimic "podman stop -t 10 echo_web_1"
+	// >>>>> 相对于 "podman stop -t 10 echo_web_1"
+
+	// set timeout to 10 seconds
+	// 设置超时时间为10秒
+	timeOut := uint(10)
+	stopOptions := containers.StopOptions{
+		Timeout: &timeOut,
+	}
 
 	// stop the container
 	// 停止容器
-
+	containers.Stop(conn, containerCreateResponse.ID, &stopOptions)
 }
