@@ -78,3 +78,26 @@ $ podman network rm echo_default
 ```
 
 ## create by using golang
+
+```bash
+$ cd podmanx/examples/echo
+
+$ go test -v
+# === RUN   TestEcho
+# image exists ? true
+# plan exists ? false
+# pod exists after creating ? true
+# pod:  pod_echo
+# network exists ? false
+# network path  /home/panhong/.config/cni/net.d/echo_default.conflist
+# network exists after creating ? true
+# INFO[0000] Going to start container "5e762c8b424624a5607fafe137980593d74372a1b96fc65fdbcb55f78efc93de" 
+# connection successful
+# remove container successful
+# remove pods successful
+# remove network successful
+# --- PASS: TestEcho (2.76s)
+# PASS
+# ok      podmanx/examples/echo   2.771s
+```
+
