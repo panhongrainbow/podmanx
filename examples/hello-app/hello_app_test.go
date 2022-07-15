@@ -3,13 +3,16 @@ package hello_app
 import (
 	"context"
 	"fmt"
+	nettypes "github.com/containers/podman/v3/libpod/network/types"
 	"github.com/containers/podman/v3/pkg/bindings"
 	"github.com/containers/podman/v3/pkg/bindings/containers"
 	"github.com/containers/podman/v3/pkg/bindings/images"
+	"github.com/containers/podman/v3/pkg/bindings/network"
 	"github.com/containers/podman/v3/pkg/bindings/pods"
 	"github.com/containers/podman/v3/pkg/domain/entities"
 	"github.com/containers/podman/v3/pkg/specgen"
 	"github.com/stretchr/testify/require"
+	"net/http"
 	"os"
 	"testing"
 )
@@ -213,5 +216,174 @@ func TestHelloApp(t *testing.T) {
 		for i := 0; i < len(listPods); i++ {
 			fmt.Println("pod: ", listPods[i].Name)
 		}
+		// >>>>> mimic "podman network exists pod_hello-app"
+		// >>>>> 相对于 "podman network exists pod_hello-app"
+
+		// check if the network exists
+		// 检查网络是否存在
+		exists, err = network.Exists(conn, "hello-app_default", nil)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+		fmt.Println("network exists ?", exists)
+
+		// crate a network if it doesn't exist
+		// 如果不存在，重新建立网路
+		if !exists {
+
+			// >>>>> mimic "podman network create --label io.podman.compose.project=hello-app --label com.docker.compose.project=hello-app hello-app_default"
+			// >>>>> 相对于 "podman network create --label io.podman.compose.project=hello-app --label com.docker.compose.project=hello-app hello-app_default"
+
+			// prepare data for creating a network
+			// 准备创建网路的资料
+			nw := "hello-app_default"
+			createOptions := network.CreateOptions{
+				Name: &nw,
+				Labels: map[string]string{
+					"io.podman.compose.project":  "hello-app",
+					"com.docker.compose.project": "hello-app",
+				},
+			}
+
+			// create a network
+			// 创建网路
+			path, err := network.Create(conn, &createOptions)
+			if err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
+			fmt.Println("network path ", path.Filename)
+
+			// check if the network exists after creating it
+			// 在创建网路完成后，再检查网络是否存在
+			exists, err = network.Exists(conn, "hello-app_default", nil)
+			if err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
+			fmt.Println("network exists after creating ?", exists)
+		}
+
+		// >>>>> mimic "podman create --name=hello-app_web_1 --pod=pod_hello-app --label io.podman.compose.config-hash=ef191a8214ebad4a7d3c0c6981f2437bde31ed9a951a6db0b44a6aabe1e76d3d --label io.podman.compose.project=hello-app --label io.podman.compose.version=1.0.4 --label com.docker.compose.project=hello-app --label com.docker.compose.project.working_dir=/home/panhong/go/src/github.com/panhongrainbow/podmanx/examples/hello-app --label com.docker.compose.project.config_files=docker-compose.yaml --label com.docker.compose.container-number=1 --label com.docker.compose.service=web --net hello-app_default --network-alias web -p 8080:8080 gcr.io/google-samples/hello-app:1.0"
+		// >>>>> 相对于 "podman create --name=hello-app_web_1 --pod=pod_hello-app --label io.podman.compose.config-hash=ef191a8214ebad4a7d3c0c6981f2437bde31ed9a951a6db0b44a6aabe1e76d3d --label io.podman.compose.project=hello-app --label io.podman.compose.version=1.0.4 --label com.docker.compose.project=hello-app --label com.docker.compose.project.working_dir=/home/panhong/go/src/github.com/panhongrainbow/podmanx/examples/hello-app --label com.docker.compose.project.config_files=docker-compose.yaml --label com.docker.compose.container-number=1 --label com.docker.compose.service=web --net hello-app_default --network-alias web -p 8080:8080 gcr.io/google-samples/hello-app:1.0"
+
+		// prepare data for creating a container
+		// 准备创建容器的资料
+		s := specgen.NewSpecGenerator("gcr.io/google-samples/hello-app:1.0", false)
+		s.Name = "hello-app_web_1"
+
+		// set the pod's network
+		// 设定容器网路配置
+		portMapping := make([]nettypes.PortMapping, 1, 1)
+		portMapping[0].HostPort = 8080
+		portMapping[0].ContainerPort = 8080
+
+		s.ContainerNetworkConfig = specgen.ContainerNetworkConfig{
+			CNINetworks:    []string{"hello-app_default"},
+			NetworkOptions: map[string][]string{},
+			Aliases: map[string][]string{
+				"hello-app_default": {"web"},
+			},
+			PortMappings: portMapping,
+		}
+
+		// add a container to a pod by using pod's id
+		// 容器利用编号加入到夹子
+		s.Pod = podID
+
+		// set the container's tags
+		// 设定容器标签
+		s.Labels = map[string]string{
+			"io.podman.compose.config-hash":           "ef191a8214ebad4a7d3c0c6981f2437bde31ed9a951a6db0b44a6aabe1e76d3d",
+			"io.podman.compose.project":               "hello-app",
+			"io.podman.compose.version":               "1.0.4",
+			"com.docker.compose.project":              "hello-app",
+			"com.docker.compose.project.working_dir":  "/home/panhong/go/src/github.com/panhongrainbow/podmanx/examples/hello-app",
+			"com.docker.compose.project.config_files": "docker-compose.yaml",
+			"com.docker.compose.container-number":     "1",
+			"com.docker.compose.service":              "web",
+		}
+
+		// create a container spec
+		// 创建一个容器规格
+		containerCreateResponse, err := containers.CreateWithSpec(conn, s, nil)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
+		// start the container
+		// 启动容器
+		if err := containers.Start(conn, containerCreateResponse.ID, nil); err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
+		// >>>>> mimic "curl http://localhost:8080"
+		// >>>>> 相对于 "curl http://localhost:8080"
+
+		// connect to container
+		// 进行连线
+		resp, err := http.Get("http://localhost:8080")
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
+		require.Equal(t, "200 OK", resp.Status)
+
+		fmt.Println("connection successful")
+
+		// >>>>> >>>>> >>>>> tear down
+		// >>>>> >>>>> >>>>> 拆除部份
+
+		// >>>>> mimic "podman stop -t 10 hello-app_web_1"
+		// >>>>> 相对于 "podman stop -t 10 hello-app_web_1"
+
+		// set timeout to 10 seconds
+		// 设置超时时间为10秒
+		timeOut := uint(10)
+		stopOptions := containers.StopOptions{
+			Timeout: &timeOut,
+		}
+
+		// stop the container
+		// 停止容器
+		err = containers.Stop(conn, containerCreateResponse.ID, &stopOptions)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
+		// >>>>> mimic "podman rm hello-app_web_1"
+		// >>>>> 相对于 "podman rm hello-app_web_1"
+
+		// remove the container
+		// 删除容器
+		err = containers.Remove(conn, containerCreateResponse.ID, nil)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+		fmt.Println("remove container successful")
+
+		// >>>>> mimic "podman pod rm pod_hello-app"
+		// >>>>> 相对于 "podman pod rm pod_hello-app"
+		_, err = pods.Remove(conn, podID, nil)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+		fmt.Println("remove pods successful")
+
+		// >>>>> mimic "podman network rm hello-app_default"
+		// >>>>> 相对于 "podman network rm hello-app_default"
+		_, err = network.Remove(conn, "hello-app_default", nil)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+		fmt.Println("remove network successful")
 	}
 }
