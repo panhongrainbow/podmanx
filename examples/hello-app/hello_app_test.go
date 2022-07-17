@@ -149,8 +149,8 @@ func TestHelloApp(t *testing.T) {
 	// 如果不存在，重新建立夹子
 	if !exists {
 
-		// >>>>> mimic "podman pod create --label io.podman.compose.project=echo --name=hello-app --infra=false --share=" (adjusted)
-		// >>>>> 相对于 "podman pod create --label io.podman.compose.project=echo --name=hello-app --infra=false --share=" (调整)
+		// >>>>> mimic "podman pod create --label io.podman.compose.project=hello-app --name=hello-app --infra=false --share=" (adjusted)
+		// >>>>> 相对于 "podman pod create --label io.podman.compose.project=hello-app --name=hello-app --infra=false --share=" (调整)
 		// ( original one: "podman pod create --name=pod_hello-app --infra=false --share=" )
 
 		// prepare data for creating a pod
