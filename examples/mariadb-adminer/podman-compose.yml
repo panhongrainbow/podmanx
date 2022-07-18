@@ -1,0 +1,16 @@
+version: '3'
+services:
+  db:
+    image: "docker.io/library/mariadb:latest"
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./db/data:/var/lib/mysql
+      - ./db/initdb.d:/docker-entrypoint-initdb.d
+    environment:
+      MYSQL_ROOT_PASSWORD: "12345"
+  adminer:
+    image: "docker.io/library/adminer:latest"
+    restart: always
+    ports:
+      - 8080:8080
