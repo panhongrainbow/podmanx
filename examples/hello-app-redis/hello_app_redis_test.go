@@ -6,6 +6,7 @@ import (
 	"github.com/containers/podman/v3/pkg/bindings"
 	"github.com/containers/podman/v3/pkg/bindings/containers"
 	"github.com/containers/podman/v3/pkg/bindings/images"
+	"github.com/containers/podman/v3/pkg/bindings/network"
 	"github.com/containers/podman/v3/pkg/bindings/pods"
 	"github.com/containers/podman/v3/pkg/domain/entities"
 	"github.com/containers/podman/v3/pkg/specgen"
@@ -224,5 +225,54 @@ func TestHelloRedisApp(t *testing.T) {
 		for i := 0; i < len(listPods); i++ {
 			fmt.Println("pod: ", listPods[i].Name)
 		}
+	}
+
+	// >>>>> mimic "podman network exists hello-app-redis_default"
+	// >>>>> 相对于 "podman network exists hello-app-redis_default"
+
+	// check if the network exists
+	// 检查网络是否存在
+	exists, err = network.Exists(conn, "hello-app-redis_default", nil)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	fmt.Println("network exists ?", exists)
+
+	// crate a network if it doesn't exist
+	// 如果不存在，重新建立网路
+	if !exists {
+
+		// >>>>> mimic "podman network create --label io.podman.compose.project=hello-app-redis --label com.docker.compose.project=hello-app-redis hello-app-redis_default"
+		// >>>>> 相对于 "podman network create --label io.podman.compose.project=hello-app-redis --label com.docker.compose.project=hello-app-redis hello-app-redis_default"
+
+		// prepare data for creating a network
+		// 准备创建网路的资料
+		nw := "hello-app-redis_default"
+		createOptions := network.CreateOptions{
+			Name: &nw,
+			Labels: map[string]string{
+				"io.podman.compose.project":  "hello-app-redis",
+				"com.docker.compose.project": "hello-app-redis",
+			},
+		}
+
+		// create a network
+		// 创建网路
+		path, err := network.Create(conn, &createOptions)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+		fmt.Println("network path ", path.Filename)
+
+		// check if the network exists after creating it
+		// 在创建网路完成后，再检查网络是否存在
+		exists, err = network.Exists(conn, "hello-app-redis_default", nil)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+		fmt.Println("network exists after creating ?", exists)
 	}
 }

@@ -216,6 +216,7 @@ func TestHelloApp(t *testing.T) {
 		for i := 0; i < len(listPods); i++ {
 			fmt.Println("pod: ", listPods[i].Name)
 		}
+
 		// >>>>> mimic "podman network exists pod_hello-app"
 		// >>>>> 相对于 "podman network exists pod_hello-app"
 
