@@ -8,6 +8,7 @@ import (
 	"github.com/containers/podman/v3/pkg/bindings/images"
 	"github.com/containers/podman/v3/pkg/bindings/network"
 	"github.com/containers/podman/v3/pkg/bindings/pods"
+	"github.com/containers/podman/v3/pkg/bindings/volumes"
 	"github.com/containers/podman/v3/pkg/domain/entities"
 	"github.com/containers/podman/v3/pkg/specgen"
 	"github.com/stretchr/testify/require"
@@ -274,5 +275,102 @@ func TestHelloRedisApp(t *testing.T) {
 			os.Exit(1)
 		}
 		fmt.Println("network exists after creating ?", exists)
+	}
+
+	// >>>>> mimic "podman volume create --label io.podman.compose.project=hello-app-redis --label com.docker.compose.project=hello-app-redis hello-app-redis_redis-node1-data"
+	// >>>>> 相对于 "podman volume create --label io.podman.compose.project=hello-app-redis --label com.docker.compose.project=hello-app-redis hello-app-redis_redis-node1-data"
+
+	// >>>>> mimic "podman volume create --label io.podman.compose.project=hello-app-redis --label com.docker.compose.project=hello-app-redis hello-app-redis_redis-node2-data"
+	// >>>>> 相对于 "podman volume create --label io.podman.compose.project=hello-app-redis --label com.docker.compose.project=hello-app-redis hello-app-redis_redis-node2-data"
+
+	// >>>>> mimic "podman volume create --label io.podman.compose.project=hello-app-redis --label com.docker.compose.project=hello-app-redis hello-app-redis_redis-node3-data"
+	// >>>>> 相对于 "podman volume create --label io.podman.compose.project=hello-app-redis --label com.docker.compose.project=hello-app-redis hello-app-redis_redis-node3-data"
+
+	// >>>>> mimic "podman volume create --label io.podman.compose.project=hello-app-redis --label com.docker.compose.project=hello-app-redis hello-app-redis_redis-node4-data"
+	// >>>>> 相对于 "podman volume create --label io.podman.compose.project=hello-app-redis --label com.docker.compose.project=hello-app-redis hello-app-redis_redis-node4-data"
+
+	// >>>>> mimic "podman volume create --label io.podman.compose.project=hello-app-redis --label com.docker.compose.project=hello-app-redis hello-app-redis_redis-node5-data"
+	// >>>>> 相对于 "podman volume create --label io.podman.compose.project=hello-app-redis --label com.docker.compose.project=hello-app-redis hello-app-redis_redis-node5-data"
+
+	// >>>>> mimic "podman volume create --label io.podman.compose.project=hello-app-redis --label com.docker.compose.project=hello-app-redis hello-app-redis_redis-data"
+	// >>>>> 相对于 "podman volume create --label io.podman.compose.project=hello-app-redis --label com.docker.compose.project=hello-app-redis hello-app-redis_redis-data"
+
+	// create five volumes if they don't exist
+	// 如果不存在时，连续创建五个卷
+
+	// plan, volumes and options
+	// 计划、卷和選項
+	volumeNames := []string{
+		"hello-app-redis_redis-node1-data",
+		"hello-app-redis_redis-node2-data",
+		"hello-app-redis_redis-node3-data",
+		"hello-app-redis_redis-node4-data",
+		"hello-app-redis_redis-node5-data",
+		"hello-app-redis_redis-data"}
+
+	volumeProject := "hello-app-redis"
+
+	volumesExistsOptions := volumes.ExistsOptions{} // empty in source code
+
+	for i := 0; i < len(volumeNames); i++ {
+		// check if the volume exists in the plan
+		// 确认计划内的卷是否已经存在
+		volumeName := volumeNames[i]
+
+		// >>>>> mimic "podman volume exists hello-app-redis_redis-node1-data"
+		// >>>>> 相对于 "podman volume exists hello-app-redis_redis-node1-data"
+
+		// >>>>> mimic "podman volume exists hello-app-redis_redis-node2-data"
+		// >>>>> 相对于 "podman volume exists hello-app-redis_redis-node2-data"
+
+		// >>>>> mimic "podman volume exists hello-app-redis_redis-node3-data"
+		// >>>>> 相对于 "podman volume exists hello-app-redis_redis-node3-data"
+
+		// >>>>> mimic "podman volume exists hello-app-redis_redis-node4-data"
+		// >>>>> 相对于 "podman volume exists hello-app-redis_redis-node4-data"
+
+		// >>>>> mimic "podman volume exists hello-app-redis_redis-node5-data"
+		// >>>>> 相对于 "podman volume exists hello-app-redis_redis-node5-data"
+
+		// >>>>> mimic "podman volume exists hello-app-redis_redis-data"
+		// >>>>> 相对于 "podman volume exists hello-app-redis_redis-data"
+
+		// check if the volume exists
+		// 检查卷是否存在
+		exists, err = volumes.Exists(conn, volumeName, &volumesExistsOptions)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+		fmt.Println("volume ["+volumeName+"] exists ?", exists)
+
+		// crate a volume if it doesn't exist
+		// 如果不存在，重新建立卷
+		if !exists {
+
+			// create a volume
+			// 创建卷
+			volumeOptions := entities.VolumeCreateOptions{
+				Name: volumeName,
+				Label: map[string]string{
+					"io.podman.compose.project":  volumeProject,
+					"com.docker.compose.project": volumeProject,
+				},
+			}
+			_, err = volumes.Create(conn, volumeOptions, nil)
+			if err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
+
+			// check if the volume exists
+			// 检查卷是否存在
+			exists, err = volumes.Exists(conn, volumeName, &volumesExistsOptions)
+			if err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
+			fmt.Println("volume ["+volumeName+"] exists after creating ?", exists)
+		}
 	}
 }
