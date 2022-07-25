@@ -395,71 +395,223 @@ func TestHelloRedisApp(t *testing.T) {
 	// >>>>> mimic "podman create --name=hello-app-redis_redis-cluster_1 --pod=pod_hello-app-redis --requires=hello-app-redis_redis-node5_1,hello-app-redis_redis-node4_1,hello-app-redis_redis-node2_1,hello-app-redis_redis-node3_1,hello-app-redis_redis-node1_1 --label io.podman.compose.config-hash=f8290d1648ed78d029eafeb3596d02a662735e61e00379b29e94a021e588d4c2 --label io.podman.compose.project=hello-app-redis --label io.podman.compose.version=1.0.4 --label com.docker.compose.project=hello-app-redis --label com.docker.compose.project.working_dir=/home/panhong/go/src/github.com/panhongrainbow/podmanx/examples/hello-app-redis --label com.docker.compose.project.config_files=docker-compose.yaml --label com.docker.compose.container-number=1 --label com.docker.compose.service=redis-cluster -e ALLOW_EMPTY_PASSWORD=yes -e REDIS_NODES="redis-node1 redis-node2 redis-node3 redis-node4 redis-node5 redis-cluster" -e REDIS_CLUSTER_CREATOR=yes -v hello-app-redis_redis-data:/bitnami/redis/data --net hello-app-redis_default --network-alias redis-cluster docker.io/bitnami/redis-cluster:6.2"
 	// >>>>> 相对于 "podman create --name=hello-app-redis_redis-cluster_1 --pod=pod_hello-app-redis --requires=hello-app-redis_redis-node5_1,hello-app-redis_redis-node4_1,hello-app-redis_redis-node2_1,hello-app-redis_redis-node3_1,hello-app-redis_redis-node1_1 --label io.podman.compose.config-hash=f8290d1648ed78d029eafeb3596d02a662735e61e00379b29e94a021e588d4c2 --label io.podman.compose.project=hello-app-redis --label io.podman.compose.version=1.0.4 --label com.docker.compose.project=hello-app-redis --label com.docker.compose.project.working_dir=/home/panhong/go/src/github.com/panhongrainbow/podmanx/examples/hello-app-redis --label com.docker.compose.project.config_files=docker-compose.yaml --label com.docker.compose.container-number=1 --label com.docker.compose.service=redis-cluster -e ALLOW_EMPTY_PASSWORD=yes -e REDIS_NODES="redis-node1 redis-node2 redis-node3 redis-node4 redis-node5 redis-cluster" -e REDIS_CLUSTER_CREATOR=yes -v hello-app-redis_redis-data:/bitnami/redis/data --net hello-app-redis_default --network-alias redis-cluster docker.io/bitnami/redis-cluster:6.2"
 
-	// prepare data for creating a container
-	// 准备创建容器的资料
-	s := specgen.NewSpecGenerator("docker.io/bitnami/redis-cluster:6.2", false)
-	s.Name = "hello-app-redis_redis-node1_1"
+	// >>>>> establish a list for creating redis containers
+	// >>>>> 先产生要创建的容器列表
+	type redisContainer struct {
+		name      string
+		pod       string
+		image     string
+		labels    map[string]string
+		envs      map[string]string
+		volume    string
+		net       string
+		netAliase string
+	}
 
-	// set the pod's network
-	// 设定容器网路配置
-	s.ContainerNetworkConfig = specgen.ContainerNetworkConfig{
-		CNINetworks:    []string{"hello-app-redis_default"},
-		NetworkOptions: map[string][]string{},
-		Aliases: map[string][]string{
-			"hello-app-redis_default": {"redis-node1"},
+	redisContainers := []redisContainer{
+		{
+			name:  "hello-app-redis_redis-node1_1",
+			pod:   "pod_hello-app-redis",
+			image: "docker.io/bitnami/redis-cluster:6.2",
+			labels: map[string]string{
+				"io.podman.compose.config-hash":           "f8290d1648ed78d029eafeb3596d02a662735e61e00379b29e94a021e588d4c2",
+				"io.podman.compose.project":               "hello-app-redis",
+				"io.podman.compose.version":               "1.0.4",
+				"com.docker.compose.project":              "hello-app-redis",
+				"com.docker.compose.project.working_dir":  "/home/panhong/go/src/github.com/panhongrainbow/podmanx/examples/hello-app-redis",
+				"com.docker.compose.project.config_files": "docker-compose.yaml",
+				"com.docker.compose.container-number":     "1",
+				"com.docker.compose.service":              "redis-node1",
+			},
+			envs: map[string]string{
+				"ALLOW_EMPTY_PASSWORD": "yes",
+				"REDIS_NODES":          "redis-node1 redis-node2 redis-hello-app_defaultnode3 redis-node4 redis-node5 redis-cluster",
+			},
+			volume:    "hello-app-redis_redis-node1-data:/bitnami/redis/data",
+			net:       "hello-app-redis_default",
+			netAliase: "redis-node1",
+		},
+		{
+			name:  "hello-app-redis_redis-node2_1",
+			pod:   "pod_hello-app-redis",
+			image: "docker.io/bitnami/redis-cluster:6.2",
+			labels: map[string]string{
+				"io.podman.compose.config-hash":           "f8290d1648ed78d029eafeb3596d02a662735e61e00379b29e94a021e588d4c2",
+				"io.podman.compose.project":               "hello-app-redis",
+				"io.podman.compose.version":               "1.0.4",
+				"com.docker.compose.project":              "hello-app-redis",
+				"com.docker.compose.project.working_dir":  "/home/panhong/go/src/github.com/panhongrainbow/podmanx/examples/hello-app-redis",
+				"com.docker.compose.project.config_files": "docker-compose.yaml",
+				"com.docker.compose.container-number":     "1",
+				"com.docker.compose.service":              "redis-node2",
+			},
+			envs: map[string]string{
+				"ALLOW_EMPTY_PASSWORD": "yes",
+				"REDIS_NODES":          "redis-node1 redis-node2 redis-hello-app_defaultnode3 redis-node4 redis-node5 redis-cluster",
+			},
+			volume:    "hello-app-redis_redis-node2-data:/bitnami/redis/data",
+			net:       "hello-app-redis_default",
+			netAliase: "redis-node2",
+		},
+		{
+			name:  "hello-app-redis_redis-node3_1",
+			pod:   "pod_hello-app-redis",
+			image: "docker.io/bitnami/redis-cluster:6.2",
+			labels: map[string]string{
+				"io.podman.compose.config-hash":           "f8290d1648ed78d029eafeb3596d02a662735e61e00379b29e94a021e588d4c2",
+				"io.podman.compose.project":               "hello-app-redis",
+				"io.podman.compose.version":               "1.0.4",
+				"com.docker.compose.project":              "hello-app-redis",
+				"com.docker.compose.project.working_dir":  "/home/panhong/go/src/github.com/panhongrainbow/podmanx/examples/hello-app-redis",
+				"com.docker.compose.project.config_files": "docker-compose.yaml",
+				"com.docker.compose.container-number":     "1",
+				"com.docker.compose.service":              "redis-node3",
+			},
+			envs: map[string]string{
+				"ALLOW_EMPTY_PASSWORD": "yes",
+				"REDIS_NODES":          "redis-node1 redis-node2 redis-hello-app_defaultnode3 redis-node4 redis-node5 redis-cluster",
+			},
+			volume:    "hello-app-redis_redis-node3-data:/bitnami/redis/data",
+			net:       "hello-app-redis_default",
+			netAliase: "redis-node3",
+		},
+		{
+			name:  "hello-app-redis_redis-node4_1",
+			pod:   "pod_hello-app-redis",
+			image: "docker.io/bitnami/redis-cluster:6.2",
+			labels: map[string]string{
+				"io.podman.compose.config-hash":           "f8290d1648ed78d029eafeb3596d02a662735e61e00379b29e94a021e588d4c2",
+				"io.podman.compose.project":               "hello-app-redis",
+				"io.podman.compose.version":               "1.0.4",
+				"com.docker.compose.project":              "hello-app-redis",
+				"com.docker.compose.project.working_dir":  "/home/panhong/go/src/github.com/panhongrainbow/podmanx/examples/hello-app-redis",
+				"com.docker.compose.project.config_files": "docker-compose.yaml",
+				"com.docker.compose.container-number":     "1",
+				"com.docker.compose.service":              "redis-node4",
+			},
+			envs: map[string]string{
+				"ALLOW_EMPTY_PASSWORD": "yes",
+				"REDIS_NODES":          "redis-node1 redis-node2 redis-hello-app_defaultnode3 redis-node4 redis-node5 redis-cluster",
+			},
+			volume:    "hello-app-redis_redis-node4-data:/bitnami/redis/data",
+			net:       "hello-app-redis_default",
+			netAliase: "redis-node4",
+		},
+		{
+			name:  "hello-app-redis_redis-node5_1",
+			pod:   "pod_hello-app-redis",
+			image: "docker.io/bitnami/redis-cluster:6.2",
+			labels: map[string]string{
+				"io.podman.compose.config-hash":           "f8290d1648ed78d029eafeb3596d02a662735e61e00379b29e94a021e588d4c2",
+				"io.podman.compose.project":               "hello-app-redis",
+				"io.podman.compose.version":               "1.0.4",
+				"com.docker.compose.project":              "hello-app-redis",
+				"com.docker.compose.project.working_dir":  "/home/panhong/go/src/github.com/panhongrainbow/podmanx/examples/hello-app-redis",
+				"com.docker.compose.project.config_files": "docker-compose.yaml",
+				"com.docker.compose.container-number":     "1",
+				"com.docker.compose.service":              "redis-node5",
+			},
+			envs: map[string]string{
+				"ALLOW_EMPTY_PASSWORD": "yes",
+				"REDIS_NODES":          "redis-node1 redis-node2 redis-hello-app_defaultnode3 redis-node4 redis-node5 redis-cluster",
+			},
+			volume:    "hello-app-redis_redis-node5-data:/bitnami/redis/data",
+			net:       "hello-app-redis_default",
+			netAliase: "redis-node5",
+		},
+		{
+			name:  "hello-app-redis_web_1",
+			pod:   "pod_hello-app-redis",
+			image: "gcr.io/google-samples/hello-app-redis:1.0",
+			labels: map[string]string{
+				"io.podman.compose.config-hash":           "f8290d1648ed78d029eafeb3596d02a662735e61e00379b29e94a021e588d4c2",
+				"io.podman.compose.project":               "hello-app-redis",
+				"io.podman.compose.version":               "1.0.4",
+				"com.docker.compose.project":              "hello-app-redis",
+				"com.docker.compose.project.working_dir":  "/home/panhong/go/src/github.com/panhongrainbow/podmanx/examples/hello-app-redis",
+				"com.docker.compose.project.config_files": "docker-compose.yaml",
+				"com.docker.compose.container-number":     "1",
+				"com.docker.compose.service":              "web",
+			},
+			net:       "hello-app-redis_default",
+			netAliase: "web",
+		},
+		{
+			name: "hello-app-redis_redis-cluster_1",
+			pod:  "pod_hello-app-redis",
 		},
 	}
 
-	// add a container to a pod by using pod's id
-	// 容器利用编号加入到夹子
-	s.Pod = podID
+	for i := 0; i < len(redisContainers); i++ {
 
-	// set the container's tags
-	// 设定容器标签
-	s.Labels = map[string]string{
-		"io.podman.compose.config-hash":           "f8290d1648ed78d029eafeb3596d02a662735e61e00379b29e94a021e588d4c2",
-		"io.podman.compose.project":               "hello-app-redis",
-		"io.podman.compose.version":               "1.0.4",
-		"com.docker.compose.project":              "hello-app-redis",
-		"com.docker.compose.project.config_files": "docker-compose.yaml",
-		"com.docker.compose.container-number":     "1",
-		"com.docker.compose.service":              "redis-node1",
-		"com.docker.compose.project.working_dir":  "/home/panhong/go/src/github.com/panhongrainbow/podmanx/examples/hello-app-redis",
-	}
+		return
 
-	// set the container's environment variables
-	// 设定容器的环境变量
-	s.Env = map[string]string{
-		"ALLOW_EMPTY_PASSWORD":  "yes",
-		"REDIS_NODES":           "redis-node1 redis-node2 redis-hello-app_defaultnode3 redis-node4 redis-node5 redis-cluster",
-		"MARIADB_ROOT_PASSWORD": "12345",
-	}
+		// prepare data for creating a container
+		// 准备创建容器的资料
+		s := specgen.NewSpecGenerator("docker.io/bitnami/redis-cluster:6.2", false)
+		s.Name = redisContainers[i].name
 
-	// set the container's volumes
-	// 设定容器的卷
-	_, volumeVolumes, _, err := specgen.GenVolumeMounts([]string{"hello-app-redis_redis-node1-data:/bitnami/redis/data"})
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
+		// set the pod's network
+		// 设定容器网路配置
+		s.ContainerNetworkConfig = specgen.ContainerNetworkConfig{
+			CNINetworks:    []string{"hello-app-redis_default"},
+			NetworkOptions: map[string][]string{},
+			Aliases: map[string][]string{
+				"hello-app-redis_default": {"redis-node1"},
+			},
+		}
 
-	s.Volumes = make([]*specgen.NamedVolume, 0, 1)
-	for _, volume := range volumeVolumes {
-		s.Volumes = append(s.Volumes, volume)
-	}
+		// add a container to a pod by using pod's id
+		// 容器利用编号加入到夹子
+		s.Pod = podID
 
-	// create a container spec
-	// 创建一个容器规格
-	containerCreateResponse, err := containers.CreateWithSpec(conn, s, nil)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
+		// set the container's tags
+		// 设定容器标签
+		s.Labels = map[string]string{
+			"io.podman.compose.config-hash":           "f8290d1648ed78d029eafeb3596d02a662735e61e00379b29e94a021e588d4c2",
+			"io.podman.compose.project":               "hello-app-redis",
+			"io.podman.compose.version":               "1.0.4",
+			"com.docker.compose.project":              "hello-app-redis",
+			"com.docker.compose.project.config_files": "docker-compose.yaml",
+			"com.docker.compose.container-number":     "1",
+			"com.docker.compose.service":              "redis-node1",
+			"com.docker.compose.project.working_dir":  "/home/panhong/go/src/github.com/panhongrainbow/podmanx/examples/hello-app-redis",
+		}
 
-	// start the container
-	// 启动容器
-	if err := containers.Start(conn, containerCreateResponse.ID, nil); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		// set the container's environment variables
+		// 设定容器的环境变量
+		s.Env = map[string]string{
+			"ALLOW_EMPTY_PASSWORD": "yes",
+			"REDIS_NODES":          "redis-node1 redis-node2 redis-hello-app_defaultnode3 redis-node4 redis-node5 redis-cluster",
+		}
+
+		// set the container's volumes
+		// 设定容器的卷
+		_, volumeVolumes, _, err := specgen.GenVolumeMounts([]string{"hello-app-redis_redis-node1-data:/bitnami/redis/data"})
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
+		s.Volumes = make([]*specgen.NamedVolume, 0, 1)
+		for _, volume := range volumeVolumes {
+			s.Volumes = append(s.Volumes, volume)
+		}
+
+		// create a container spec
+		// 创建一个容器规格
+		containerCreateResponse, err := containers.CreateWithSpec(conn, s, nil)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
+		// start the container
+		// 启动容器
+		if err := containers.Start(conn, containerCreateResponse.ID, nil); err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
 	}
 }
