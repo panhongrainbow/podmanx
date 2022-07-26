@@ -3,6 +3,7 @@ package hello_app_redis
 import (
 	"context"
 	"fmt"
+	nettypes "github.com/containers/podman/v3/libpod/network/types"
 	"github.com/containers/podman/v3/pkg/bindings"
 	"github.com/containers/podman/v3/pkg/bindings/containers"
 	"github.com/containers/podman/v3/pkg/bindings/images"
@@ -13,7 +14,10 @@ import (
 	"github.com/containers/podman/v3/pkg/specgen"
 	"github.com/stretchr/testify/require"
 	"os"
+	"strconv"
+	"sync"
 	"testing"
+	"time"
 )
 
 var (
@@ -406,6 +410,8 @@ func TestHelloRedisApp(t *testing.T) {
 		volume    string
 		net       string
 		netAliase string
+		portMap   map[string]string
+		requires  string
 	}
 
 	redisContainers := []redisContainer{
@@ -533,85 +539,117 @@ func TestHelloRedisApp(t *testing.T) {
 				"com.docker.compose.container-number":     "1",
 				"com.docker.compose.service":              "web",
 			},
-			net:       "hello-app-redis_default",
+			net: "hello-app-redis_default",
+			portMap: map[string]string{
+				"8080": "8080",
+			},
 			netAliase: "web",
 		},
-		{
+		/*{
 			name: "hello-app-redis_redis-cluster_1",
 			pod:  "pod_hello-app-redis",
-		},
+		},*/
 	}
+
+	wg := sync.WaitGroup{}
+
+	wg.Add(len(redisContainers))
 
 	for i := 0; i < len(redisContainers); i++ {
+		go func(i int) {
+			// prepare data for creating a container
+			// 准备创建容器的资料
+			s := specgen.NewSpecGenerator(redisContainers[i].image, false)
+			s.Name = redisContainers[i].name
 
-		return
+			// set the pod's network
+			// 设定容器网路配置
+			s.ContainerNetworkConfig = specgen.ContainerNetworkConfig{
+				CNINetworks:    []string{redisContainers[i].net},
+				NetworkOptions: map[string][]string{},
+				Aliases: map[string][]string{
+					redisContainers[i].net: {redisContainers[i].netAliase},
+				},
+			}
 
-		// prepare data for creating a container
-		// 准备创建容器的资料
-		s := specgen.NewSpecGenerator("docker.io/bitnami/redis-cluster:6.2", false)
-		s.Name = redisContainers[i].name
+			// add a container to a pod by using pod's id
+			// 容器利用编号加入到夹子
+			s.Pod = podID
 
-		// set the pod's network
-		// 设定容器网路配置
-		s.ContainerNetworkConfig = specgen.ContainerNetworkConfig{
-			CNINetworks:    []string{"hello-app-redis_default"},
-			NetworkOptions: map[string][]string{},
-			Aliases: map[string][]string{
-				"hello-app-redis_default": {"redis-node1"},
-			},
-		}
+			// set the container's tags
+			// 设定容器标签
+			s.Labels = make(map[string]string, len(redisContainers[i].labels))
+			for k, v := range redisContainers[i].labels {
+				s.Labels[k] = v
+			}
 
-		// add a container to a pod by using pod's id
-		// 容器利用编号加入到夹子
-		s.Pod = podID
+			// set the container's environment variables
+			// 设定容器的环境变量
+			s.Env = make(map[string]string, len(redisContainers[i].envs))
+			for k, v := range redisContainers[i].envs {
+				s.Env[k] = v
+			}
 
-		// set the container's tags
-		// 设定容器标签
-		s.Labels = map[string]string{
-			"io.podman.compose.config-hash":           "f8290d1648ed78d029eafeb3596d02a662735e61e00379b29e94a021e588d4c2",
-			"io.podman.compose.project":               "hello-app-redis",
-			"io.podman.compose.version":               "1.0.4",
-			"com.docker.compose.project":              "hello-app-redis",
-			"com.docker.compose.project.config_files": "docker-compose.yaml",
-			"com.docker.compose.container-number":     "1",
-			"com.docker.compose.service":              "redis-node1",
-			"com.docker.compose.project.working_dir":  "/home/panhong/go/src/github.com/panhongrainbow/podmanx/examples/hello-app-redis",
-		}
+			// set the container's volumes
+			// 设定容器的卷
+			if redisContainers[i].volume != "" {
+				_, volumeVolumes, _, err := specgen.GenVolumeMounts([]string{redisContainers[i].volume})
+				if err != nil {
+					fmt.Println(err)
+					os.Exit(1)
+				}
 
-		// set the container's environment variables
-		// 设定容器的环境变量
-		s.Env = map[string]string{
-			"ALLOW_EMPTY_PASSWORD": "yes",
-			"REDIS_NODES":          "redis-node1 redis-node2 redis-hello-app_defaultnode3 redis-node4 redis-node5 redis-cluster",
-		}
+				s.Volumes = make([]*specgen.NamedVolume, 0, 1)
+				for _, volume := range volumeVolumes {
+					s.Volumes = append(s.Volumes, volume)
+				}
+			}
 
-		// set the container's volumes
-		// 设定容器的卷
-		_, volumeVolumes, _, err := specgen.GenVolumeMounts([]string{"hello-app-redis_redis-node1-data:/bitnami/redis/data"})
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
+			// create a container spec
+			// 创建一个容器规格
+			containerCreateResponse, err := containers.CreateWithSpec(conn, s, nil)
+			if err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
 
-		s.Volumes = make([]*specgen.NamedVolume, 0, 1)
-		for _, volume := range volumeVolumes {
-			s.Volumes = append(s.Volumes, volume)
-		}
+			// set the container's ports
+			// 设定容器的端口
+			for k, v := range redisContainers[i].portMap {
+				key, _ := strconv.ParseUint(k, 16, 16)
+				value, _ := strconv.ParseUint(v, 16, 16)
+				tmp := nettypes.PortMapping{
+					ContainerPort: uint16(value),
+					HostPort:      uint16(key),
+				}
+				s.PortMappings = append(s.PortMappings, tmp)
+			}
 
-		// create a container spec
-		// 创建一个容器规格
-		containerCreateResponse, err := containers.CreateWithSpec(conn, s, nil)
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
+			// start the container
+			// 启动容器
+			if err := containers.Start(conn, containerCreateResponse.ID, nil); err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
 
-		// start the container
-		// 启动容器
-		if err := containers.Start(conn, containerCreateResponse.ID, nil); err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
+			// wait for the container to be ready
+			// 等待容器准备就绪
+			for {
+				containerStatus, err := containers.Inspect(conn, containerCreateResponse.ID, nil)
+				if err != nil {
+					fmt.Println(err)
+					os.Exit(1)
+				}
+				if containerStatus.State.Running {
+					break
+				}
+				time.Sleep(5 * time.Second)
+			}
+
+			wg.Done()
+		}(i)
 
 	}
+
+	wg.Wait()
 }
